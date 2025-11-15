@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:3000';
@@ -28,15 +27,17 @@ apiClient.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+// ============================
 
+// User API calls
 export const userApi = {
   login: (credentials: { username: string; password: string }) =>
     apiClient.post('/api/users/login', credentials), 
-
+  
   register: (userData: { username: string; email: string; password: string }) => 
     apiClient.post('/api/users', userData),
 
-  
+  // Fungsi ini sekarang akan otomatis mengirim token
   getUsers: () => apiClient.get('/api/users'),
   deleteUser: (id: string) => apiClient.delete(`/api/users/${id}`),
 };

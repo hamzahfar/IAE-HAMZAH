@@ -1,25 +1,22 @@
 const Joi = require('joi');
 
-// User validation schema (Register/Create)
+// User validation schema (Register)
 const userSchema = Joi.object({
-  username: Joi.string().min(3).max(30).required(),
+  username: Joi.string().min(3).max(30).required(), 
   email: Joi.string().email().required(),
-  password: Joi.string().min(6).required(),
-  age: Joi.number().integer().min(1).max(150).optional(),
+  password: Joi.string().min(6).required(), 
+  age: Joi.number().integer().min(1).max(150).optional(), 
   role: Joi.string().valid('admin', 'user', 'moderator').optional()
 });
 
-// User update validation schema (all fields optional)
-// Kita sesuaikan juga agar bisa update username/password jika perlu
 const userUpdateSchema = Joi.object({
   username: Joi.string().min(3).max(30).optional(),
   email: Joi.string().email().optional(),
   password: Joi.string().min(6).optional(),
   age: Joi.number().integer().min(1).max(150).optional(),
   role: Joi.string().valid('admin', 'user', 'moderator').optional()
-}).min(1); // At least one field must be provided
+}).min(1); 
 
-// Validation middleware for creating users
 const validateUser = (req, res, next) => {
   const { error } = userSchema.validate(req.body);
   
@@ -34,7 +31,6 @@ const validateUser = (req, res, next) => {
   next();
 };
 
-// Validation middleware for updating users
 const validateUserUpdate = (req, res, next) => {
   const { error } = userUpdateSchema.validate(req.body);
   

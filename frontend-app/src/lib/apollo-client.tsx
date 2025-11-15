@@ -1,4 +1,3 @@
-
 'use client';
 
 import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '@apollo/client';
@@ -8,19 +7,26 @@ const httpLink = createHttpLink({
   uri: process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:4000/graphql',
 });
 
-
+// === UPDATE AUTH LINK ===
 const authLink = setContext((_, { headers }) => {
-  
-  const token = localStorage.getItem('token');
-
-  
-  return {
-    headers: {
-      ...headers,
-      authorization: token ? `Bearer ${token}` : "",
+  // Cek apakah kode berjalan di browser
+  if (typeof window !== 'undefined') {
+    // Ambil token dari local storage
+    const token = localStorage.getItem('token');
+    
+    // Kembalikan headers ke context
+    return {
+      headers: {
+        ...headers,
+        authorization: token ? `Bearer ${token}` : "",
+      }
     }
   }
+  return {
+    headers
+  };
 });
+// ========================
 
 const client = new ApolloClient({
   link: authLink.concat(httpLink),

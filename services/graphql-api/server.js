@@ -1,18 +1,23 @@
-
+// ===== IMPOR LAMA ANDA =====
 const express = require('express');
 const { ApolloServer } = require('apollo-server-express');
 const { PubSub } = require('graphql-subscriptions');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 
+
+// ===== IMPOR BARU UNTUK APOLLO v3 + SUBSCRIPTIONS =====
 const { createServer } = require('http');
 const { ApolloServerPluginDrainHttpServer } = require('apollo-server-core');
 const { makeExecutableSchema } = require('@graphql-tools/schema');
 const { WebSocketServer } = require('ws');
 const { useServer } = require('graphql-ws/lib/use/ws');
+// ===================================================
+
 
 const app = express();
 const pubsub = new PubSub();
+
 
 // Enable CORS (Kode Anda, tidak berubah)
 app.use(cors({
@@ -26,8 +31,8 @@ app.use(cors({
 }));
 
 
-
-let tasks = [ 
+// --- In-memory data store (DIGANTI DARI POSTS MENJADI TASKS) ---
+let tasks = [ // Ganti nama 'posts' menjadi 'tasks'
   {
     id: '1',
     title: 'Learn GraphQL Subscriptions',
@@ -187,6 +192,7 @@ const resolvers = {
 };
 
 
+// ===== FUNGSI startServer() BARU UNTUK v3 (Tidak berubah dari sebelumnya) =====
 async function startServer() {
   // Buat 'schema' (gabungan typeDefs dan resolvers)
   const schema = makeExecutableSchema({ typeDefs, resolvers });
@@ -199,10 +205,11 @@ async function startServer() {
   // Buat server WebSocket
   const wsServer = new WebSocketServer({
     server: httpServer,
-    path: '/graphql', 
+    path: '/graphql', // Path harus SAMA dengan Apollo Server
   });
 
 
+  // Siapkan 'cleanup' handler untuk WebSocket menggunakan 'graphql-ws'
   const serverCleanup = useServer({ schema }, wsServer);
 
 
@@ -216,6 +223,8 @@ async function startServer() {
       // Plugin #1: Untuk mematikan httpServer dengan benar
       ApolloServerPluginDrainHttpServer({ httpServer }),
 
+
+      // Plugin #2: Untuk mematikan WebSocket server dengan benar
       {
         async serverWillStart() {
           return {
@@ -226,6 +235,7 @@ async function startServer() {
         },
       },
      
+      // Plugin #3: Logger Anda yang lama
       {
         requestDidStart() {
           return {
@@ -248,6 +258,9 @@ async function startServer() {
 
   const PORT = process.env.PORT || 4000;
 
+
+  // Jalankan servernya!
+  // Kita .listen() di 'httpServer', BUKAN 'app'
   httpServer.listen(PORT, () => {
     console.log(`🚀 GraphQL API Server running on port ${PORT}`);
     console.log(`🔗 GraphQL endpoint: http://localhost:${PORT}${server.graphqlPath}`);
@@ -255,7 +268,7 @@ async function startServer() {
   });
 
 
- 
+  // Graceful shutdown (Kode Anda, tidak berubah)
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
     httpServer.close(() => {
@@ -263,22 +276,24 @@ async function startServer() {
     });
   });
 }
+// =============================================
 
 
-
-
+// Health check endpoint (DIGANTI DARI POSTS MENJADI TASKS)
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'graphql-api',
     timestamp: new Date().toISOString(),
     data: {
-      tasks: tasks.length, 
+      tasks: tasks.length, // Ganti 'posts' menjadi 'tasks'
       comments: comments.length
     }
   });
 });
 
+
+// Error handling (Kode Anda, tidak berubah)
 app.use((err, req, res, next) => {
 /**
  * @deprecated
@@ -291,6 +306,7 @@ app.use((err, req, res, next) => {
 });
 
 
+// Start server (Kode Anda, tidak berubah)
 startServer().catch(error => {
   console.error('Failed to start GraphQL server:', error);
   process.exit(1);
