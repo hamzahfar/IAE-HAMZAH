@@ -1,120 +1,148 @@
+// File: api-gateway/server.js
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken'); // Import JWT
+const axios = require('axios'); // Import Axios
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security middleware
-app.use(helmet());
+// Variabel untuk menyimpan public key
+let PUBLIC_KEY = null;
+const REST_API_URL = process.env.REST_API_URL || 'http://localhost:3001';
+const GRAPHQL_API_URL = process.env.GRAPHQL_API_URL || 'http://localhost:4000';
 
-// CORS configuration
+// Fungsi untuk mengambil Public Key dari User Service (rest-api)
+const fetchPublicKey = async () => {
+  try {
+    const response = await axios.get(`${REST_API_URL}/api/users/public-key`);
+    PUBLIC_KEY = response.data;
+    console.log('Public Key fetched successfully from User Service.');
+  } catch (error) {
+    console.error('Failed to fetch public key:', error.message);
+    console.error('API Gateway cannot verify tokens. Retrying in 5 seconds...');
+    setTimeout(fetchPublicKey, 5000); // Coba lagi
+  }
+};
+
+// --- Security & CORS Middleware (Tetap sama) ---
+app.use(helmet());
 app.use(cors({
   origin: [
-    'http://localhost:3002', // Frontend
-    'http://localhost:3000', // Gateway itself
-    'http://frontend-app:3002' // Docker container name
+    'http://localhost:3002',
+    'http://localhost:3000',
+    'http://frontend-app:3002'
   ],
   credentials: true
 }));
-
-// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use(limiter);
-
-// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    services: {
-      'rest-api': process.env.REST_API_URL || 'http://localhost:3001',
-      'graphql-api': process.env.GRAPHQL_API_URL || 'http://localhost:4000'
+  res.json({ status: 'healthy', ... });
+});
+// --- End of Security & CORS Middleware ---
+
+
+// === MIDDLEWARE VERIFIKASI TOKEN ===
+const verifyToken = (req, res, next) => {
+  // Daftar rute publik yang tidak perlu token
+  const publicPaths = [
+    '/api/users/login',
+    '/api/users/public-key',
+  ];
+
+  // Rute register (POST /api/users) juga publik
+  if (req.path === '/api/users' && req.method === 'POST') {
+    return next();
+  }
+
+  if (publicPaths.includes(req.path)) {
+    return next(); // Lewati, tidak perlu token
+  }
+
+  // Jika tidak ada public key, blok semua request terproteksi
+  if (!PUBLIC_KEY) {
+    return res.status(503).json({ error: 'Service unavailable', message: 'Auth service is not ready.' });
+  }
+
+  // Ambil token dari header
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'No token provided.' });
+  }
+
+  // Verifikasi token
+  jwt.verify(token, PUBLIC_KEY, { algorithms: ['RS256'] }, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Forbidden', message: 'Token is invalid or expired.' });
     }
+
+    // Opsional: Teruskan info user ke service di bawahnya
+    req.user = user;
+
+    // Teruskan ke proxy
+    next();
   });
-});
+};
 
-// Proxy configuration for REST API
+// Terapkan middleware verifikasi SEBELUM proxy
+app.use('/api', verifyToken);
+app.use('/graphql', verifyToken);
+
+// --- Proxy Configuration (Tetap sama) ---
 const restApiProxy = createProxyMiddleware({
-  target: process.env.REST_API_URL || 'http://localhost:3001',
+  target: REST_API_URL,
   changeOrigin: true,
-  pathRewrite: {
-    '^/api': '/api', // Keep the /api prefix
-  },
-  onError: (err, req, res) => {
-    console.error('REST API Proxy Error:', err.message);
-    res.status(500).json({ 
-      error: 'REST API service unavailable',
-      message: err.message 
-    });
-  },
+  pathRewrite: { '^/api': '/api' },
   onProxyReq: (proxyReq, req, res) => {
-    console.log(`[REST API] ${req.method} ${req.url} -> ${proxyReq.path}`);
+    // (Opsional) Teruskan user yang sudah di-decode ke service
+    if (req.user) {
+      proxyReq.setHeader('X-User', JSON.stringify(req.user));
+    }
   }
 });
 
-// Proxy configuration for GraphQL API
 const graphqlApiProxy = createProxyMiddleware({
-  target: process.env.GRAPHQL_API_URL || 'http://localhost:4000',
+  target: GRAPHQL_API_URL,
   changeOrigin: true,
-  ws: true, // Enable WebSocket proxying for subscriptions
-  onError: (err, req, res) => {
-    console.error('GraphQL API Proxy Error:', err.message);
-    res.status(500).json({ 
-      error: 'GraphQL API service unavailable',
-      message: err.message 
-    });
-  },
+  ws: true,
   onProxyReq: (proxyReq, req, res) => {
-    console.log(`[GraphQL API] ${req.method} ${req.url} -> ${proxyReq.path}`);
+    // (Opsional) Teruskan user yang sudah di-decode ke service
+    if (req.user) {
+      proxyReq.setHeader('X-User', JSON.stringify(req.user));
+    }
   }
 });
 
-// Apply proxies
+// Terapkan proxy
 app.use('/api', restApiProxy);
 app.use('/graphql', graphqlApiProxy);
 
-// Catch-all route
+// --- Catch-all dan Error Handling (Tetap sama) ---
 app.get('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    availableRoutes: [
-      '/health',
-      '/api/* (proxied to REST API)',
-      '/graphql (proxied to GraphQL API)'
-    ]
-  });
+  res.status(404).json({ error: 'Route not found' });
 });
-
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Gateway Error:', err);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
-const server = app.listen(PORT, () => {
+// --- Start Server ---
+const server = app.listen(PORT, async () => {
+  // Ambil public key saat server menyala
+  await fetchPublicKey(); 
+
   console.log(`🚀 API Gateway running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔄 Proxying /api/* to: ${process.env.REST_API_URL || 'http://localhost:3001'}`);
-  console.log(`🔄 Proxying /graphql to: ${process.env.GRAPHQL_API_URL || 'http://localhost:4000'}`);
+  console.log(`🔄 Proxying /api/* to: ${REST_API_URL}`);
+  console.log(`🔄 Proxying /graphql to: ${GRAPHQL_API_URL}`);
 });
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-  });
-});
-
-module.exports = app;

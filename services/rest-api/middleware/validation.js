@@ -1,17 +1,20 @@
 const Joi = require('joi');
 
-// User validation schema
+// User validation schema (Register/Create)
 const userSchema = Joi.object({
-  name: Joi.string().min(2).max(50).required(),
+  username: Joi.string().min(3).max(30).required(),
   email: Joi.string().email().required(),
-  age: Joi.number().integer().min(1).max(150).required(),
+  password: Joi.string().min(6).required(),
+  age: Joi.number().integer().min(1).max(150).optional(),
   role: Joi.string().valid('admin', 'user', 'moderator').optional()
 });
 
 // User update validation schema (all fields optional)
+// Kita sesuaikan juga agar bisa update username/password jika perlu
 const userUpdateSchema = Joi.object({
-  name: Joi.string().min(2).max(50).optional(),
+  username: Joi.string().min(3).max(30).optional(),
   email: Joi.string().email().optional(),
+  password: Joi.string().min(6).optional(),
   age: Joi.number().integer().min(1).max(150).optional(),
   role: Joi.string().valid('admin', 'user', 'moderator').optional()
 }).min(1); // At least one field must be provided

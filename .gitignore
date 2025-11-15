@@ -10,3 +10,4 @@ services/*/node_modules
 api-gateway/node_modules
 frontend-app/node_modules
 frontend-app/.next
+*.pem
