@@ -61,14 +61,12 @@ app.get('/health', (req, res) => {
 
 // === MIDDLEWARE VERIFIKASI TOKEN ===
 const verifyToken = (req, res, next) => {
-  // Daftar rute publik yang tidak perlu token
   const publicPaths = [
-    '/api/users/login',
-    '/api/users/public-key',
+    '/users/login',
+    '/users/public-key',
   ];
 
-  // Rute register (POST /api/users) juga publik
-  if (req.path === '/api/users' && req.method === 'POST') {
+  if (req.path === '/users' && req.method === 'POST') {
     return next();
   }
 
@@ -76,7 +74,6 @@ const verifyToken = (req, res, next) => {
     return next(); // Lewati, tidak perlu token
   }
 
-  // Jika tidak ada public key, blok semua request terproteksi
   if (!PUBLIC_KEY) {
     return res.status(503).json({ error: 'Service unavailable', message: 'Auth service is not ready.' });
   }
@@ -94,10 +91,9 @@ const verifyToken = (req, res, next) => {
     if (err) {
       return res.status(403).json({ error: 'Forbidden', message: 'Token is invalid or expired.' });
     }
-    
-    // Opsional: Teruskan info user ke service di bawahnya
+
     req.user = user;
-    
+
     // Teruskan ke proxy
     next();
   });
