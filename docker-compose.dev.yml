@@ -61,7 +61,9 @@ services:
       - "3002:3000"
     environment:
       - NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:3000
-      - NEXT_PUBLIC_GRAPHQL_URL=http://localhost:4000/graphql
+      # === PERUBAHAN DI SINI ===
+      - NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3000/graphql
+      # ========================
     depends_on:
       - api-gateway
     volumes:

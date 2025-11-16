@@ -26,9 +26,18 @@ const CREATE_TASK_QUERY = `
   }
 `;
 
+// === TAMBAHKAN MUTASI DELETE ===
+const DELETE_TASK_MUTATION = `
+  mutation DeleteTask($id: ID!) {
+    deleteTask(id: $id)
+  }
+`;
+// =============================
+
 // Definisikan tipe untuk user agar TypeScript senang
 interface User {
   username: string;
+  role: string; // <-- TAMBAHKAN ROLE
 }
 
 // Tipe data untuk Task
@@ -69,14 +78,34 @@ export default function TasksPage() {
       })
     });
 
+    // Cek jika response BUKAN ok
     if (!res.ok) {
-      if(res.status === 401 || res.status === 403) {
+      if (res.status === 401 || res.status === 403) {
         // Token tidak valid, logout user
         handleLogout();
       }
-      throw new Error(`GraphQL request failed with status ${res.status}`);
+      // Coba baca error dari body
+      try {
+        const errorBody = await res.json();
+        if (errorBody.errors && errorBody.errors[0]) {
+          throw new Error(errorBody.errors[0].message);
+        } else {
+          throw new Error(`GraphQL request failed with status ${res.status}`);
+        }
+      } catch (e: any) {
+        // Fallback jika body bukan JSON atau error parsing lain
+        throw new Error(e.message || `GraphQL request failed with status ${res.status}`);
+      }
     }
-    return res.json();
+    
+    const responseBody = await res.json();
+    
+    // Cek error GraphQL di body response
+    if (responseBody.errors && responseBody.errors[0]) {
+      throw new Error(responseBody.errors[0].message);
+    }
+    
+    return responseBody;
   };
 
   // 3. Pengecekan Otorisasi/Login saat halaman dimuat
@@ -114,8 +143,6 @@ export default function TasksPage() {
       const response = await fetchGraphQL(GET_TASKS_QUERY);
       if (response.data?.tasks) {
         setTasks(response.data.tasks);
-      } else if (response.errors) {
-        throw new Error(response.errors[0].message);
       }
     } catch (err: any) {
       setError(err.message || "Gagal memuat tasks");
@@ -127,6 +154,7 @@ export default function TasksPage() {
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    setError(null); // Bersihkan error
 
     try {
       await fetchGraphQL(CREATE_TASK_QUERY, {
@@ -141,6 +169,24 @@ export default function TasksPage() {
       setError(err.message || "Gagal membuat task");
     }
   };
+
+  // === TAMBAHKAN FUNGSI DELETE ===
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus task ini?')) {
+      return;
+    }
+
+    setError(null); // Bersihkan error sebelumnya
+    try {
+      await fetchGraphQL(DELETE_TASK_MUTATION, { id });
+      fetchTasks(); // Ambil ulang data tasks setelah menghapus
+    } catch (err: any) {
+      console.error('Error deleting task:', err);
+      // Tampilkan error ke pengguna jika gagal (karena ForbiddenError)
+      setError(err.message || "Gagal menghapus task");
+    }
+  };
+  // ===============================
 
   // 5. handleLogout yang sudah diperbarui
   const handleLogout = () => {
@@ -229,10 +275,25 @@ export default function TasksPage() {
             <div key={task.id} className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
               <h3 className="text-lg font-bold text-gray-800">{task.title}</h3>
               <p className="text-gray-600 mt-2">{task.content}</p>
-              <div className="mt-4 flex justify-between text-sm text-gray-400">
+              
+              {/* === PERUBAHAN DI SINI === */}
+              <div className="mt-4 flex justify-between items-center text-sm text-gray-400">
                 <span>Assigned to: {task.author}</span>
-                <span>{new Date(task.createdAt).toLocaleDateString()}</span>
+                <div className="flex items-center gap-4">
+                  <span>{new Date(task.createdAt).toLocaleDateString()}</span>
+                  
+                  {/* TOMBOL HAPUS KONDISIONAL */}
+                  {user && user.role === 'admin' && (
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
+              {/* ======================== */}
             </div>
           ))}
 

@@ -20,7 +20,18 @@ let users = [
     role: 'admin',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
+  },
+  // === TAMBAHKAN ADMIN BARU DI SINI ===
+  {
+    id: 'admin-id-01',
+    username: 'admin',
+    email: 'admin@gmail.com',
+    password: '123456',
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   }
+  // ===================================
 ];
 
 

@@ -1,6 +1,7 @@
 // ===== IMPOR LAMA ANDA =====
 const express = require('express');
-const { ApolloServer } = require('apollo-server-express');
+// GANTI BARIS INI
+const { ApolloServer, ForbiddenError } = require('apollo-server-express');
 const { PubSub } = require('graphql-subscriptions');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
@@ -138,7 +139,15 @@ const resolvers = {
       return updatedTask;
     },
 
-    deleteTask: (_, { id }) => {
+    // === PERUBAHAN DI SINI ===
+    deleteTask: (_, { id }, context) => { // 1. Tambahkan 'context'
+      
+      // 2. Tambahkan cek otorisasi
+      if (!context.user || context.user.role !== 'admin') {
+        throw new ForbiddenError('Hanya admin yang dapat menghapus task.');
+      }
+
+      // 3. Logika hapus yang sudah ada
       const taskIndex = tasks.findIndex(task => task.id === id);
       if (taskIndex === -1) { return false; }
       // Hapus juga komen yang terkait (jika ada)
@@ -147,6 +156,7 @@ const resolvers = {
       pubsub.publish('TASK_DELETED', { taskDeleted: id });
       return true;
     },
+    // ========================
 
     // --- Resolvers comment (biarkan atau hapus) ---
     createComment: (_, { postId, content, author }) => {
@@ -209,9 +219,23 @@ async function startServer() {
 
   const server = new ApolloServer({
     schema, 
+    // === PERUBAHAN DI SINI ===
     context: ({ req }) => {
-      return { req };
+      // Ambil header X-User yang dikirim oleh API Gateway
+      const userHeader = req.headers['x-user'];
+      let user = null;
+      if (userHeader) {
+        try {
+          // Parse data user dari header
+          user = JSON.parse(userHeader);
+        } catch (e) {
+          console.error('Gagal parse header X-User:', e);
+        }
+      }
+      // Tambahkan user ke context agar bisa diakses resolver
+      return { req, user };
     },
+    // ========================
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
 
