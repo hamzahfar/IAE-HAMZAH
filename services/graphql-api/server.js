@@ -18,26 +18,22 @@ const { useServer } = require('graphql-ws/lib/use/ws');
 const app = express();
 const pubsub = new PubSub();
 
-
-// Enable CORS (Kode Anda, tidak berubah)
 app.use(cors({
   origin: [
-    'http://localhost:3000', // API Gateway
-    'http://localhost:3002', // Frontend
-    'http://api-gateway:3000', // Docker container name
-    'http://frontend-app:3002' // Docker container name
+    'http://localhost:3000', 
+    'http://localhost:3002', 
+    'http://api-gateway:3000', 
+    'http://frontend-app:3002' 
   ],
   credentials: true
 }));
 
-
-// --- In-memory data store (DIGANTI DARI POSTS MENJADI TASKS) ---
-let tasks = [ // Ganti nama 'posts' menjadi 'tasks'
+let tasks = [ 
   {
     id: '1',
     title: 'Learn GraphQL Subscriptions',
     content: 'Implement real-time updates for the task list.',
-    author: 'johndoe', // Sesuaikan dengan user Anda
+    author: 'johndoe', 
     createdAt: new Date().toISOString(),
   },
   {
@@ -51,7 +47,7 @@ let tasks = [ // Ganti nama 'posts' menjadi 'tasks'
 let comments = [
   {
     id: '1',
-    postId: '1', // Biarkan ini, atau bisa Anda hapus jika fitur comment tidak relevan
+    postId: '1', 
     content: 'This is a high priority task!',
     author: 'Jane Smith',
     createdAt: new Date().toISOString(),
@@ -192,7 +188,6 @@ const resolvers = {
 };
 
 
-// ===== FUNGSI startServer() BARU UNTUK v3 (Tidak berubah dari sebelumnya) =====
 async function startServer() {
   // Buat 'schema' (gabungan typeDefs dan resolvers)
   const schema = makeExecutableSchema({ typeDefs, resolvers });
@@ -212,19 +207,15 @@ async function startServer() {
   // Siapkan 'cleanup' handler untuk WebSocket menggunakan 'graphql-ws'
   const serverCleanup = useServer({ schema }, wsServer);
 
-
-  // Buat Apollo Server
   const server = new ApolloServer({
-    schema, // Gunakan schema yang sudah dibuat
+    schema, 
     context: ({ req }) => {
       return { req };
     },
     plugins: [
-      // Plugin #1: Untuk mematikan httpServer dengan benar
       ApolloServerPluginDrainHttpServer({ httpServer }),
 
 
-      // Plugin #2: Untuk mematikan WebSocket server dengan benar
       {
         async serverWillStart() {
           return {
@@ -235,7 +226,6 @@ async function startServer() {
         },
       },
      
-      // Plugin #3: Logger Anda yang lama
       {
         requestDidStart() {
           return {
@@ -248,27 +238,19 @@ async function startServer() {
     ],
   });
 
-
-  // Mulai server Apollo
   await server.start();
  
-  // Terapkan middleware Express ke Apollo
   server.applyMiddleware({ app, path: '/graphql' });
 
 
   const PORT = process.env.PORT || 4000;
 
-
-  // Jalankan servernya!
-  // Kita .listen() di 'httpServer', BUKAN 'app'
   httpServer.listen(PORT, () => {
     console.log(`🚀 GraphQL API Server running on port ${PORT}`);
     console.log(`🔗 GraphQL endpoint: http://localhost:${PORT}${server.graphqlPath}`);
     console.log(`📡 Subscriptions ready at ws://localhost:${PORT}${server.graphqlPath}`);
   });
 
-
-  // Graceful shutdown (Kode Anda, tidak berubah)
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
     httpServer.close(() => {
@@ -276,24 +258,19 @@ async function startServer() {
     });
   });
 }
-// =============================================
 
-
-// Health check endpoint (DIGANTI DARI POSTS MENJADI TASKS)
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'graphql-api',
     timestamp: new Date().toISOString(),
     data: {
-      tasks: tasks.length, // Ganti 'posts' menjadi 'tasks'
+      tasks: tasks.length, 
       comments: comments.length
     }
   });
 });
 
-
-// Error handling (Kode Anda, tidak berubah)
 app.use((err, req, res, next) => {
 /**
  * @deprecated
@@ -305,8 +282,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-
-// Start server (Kode Anda, tidak berubah)
 startServer().catch(error => {
   console.error('Failed to start GraphQL server:', error);
   process.exit(1);
